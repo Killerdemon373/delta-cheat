@@ -1,12 +1,11 @@
--- Delta Cheat | Silent Aim + Aimbot + ESP + Speed + Infinite Jump
--- Load with: loadstring(game:HttpGet("https://raw.githubusercontent.com/Killerdemon373/delta-cheat/main/delta_cheat.lua"))()
-
-print("=== LOADING CHEAT ===")
+-- Delta Cheat v2 | Silent Aim + Aimbot + ESP + Speed + Infinite Jump + Simple UI
+print("=== LOADING CHEAT v2 ===")
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
 local Mouse = Player:GetMouse()
 
@@ -15,8 +14,8 @@ local Settings = {
     Aimbot = true,
     ESP = true,
     TeamCheck = true,
-    FOV = 120,
-    Smoothness = 0.18,
+    FOV = 150,
+    Smoothness = 0.15,
     Speed = false,
     SpeedValue = 50,
     InfiniteJump = true,
@@ -27,7 +26,7 @@ local CurrentTarget = nil
 local FOVCircle = nil
 local ESPObjects = {}
 
--- Drawing
+-- ===================== DRAWING =====================
 pcall(function()
     FOVCircle = Drawing.new("Circle")
     FOVCircle.Thickness = 1.5
@@ -35,10 +34,9 @@ pcall(function()
     FOVCircle.Radius = Settings.FOV
     FOVCircle.Filled = false
     FOVCircle.Color = Color3.fromRGB(0, 255, 140)
-    FOVCircle.Visible = Settings.ShowFOV
-    FOVCircle.Transparency = 0.5
+    FOVCircle.Visible = true
+    FOVCircle.Transparency = 0.4
 end)
-print("drawing ready")
 
 local function getClosest()
     local closest, shortest = nil, Settings.FOV
@@ -64,29 +62,49 @@ local function getClosest()
     return closest
 end
 
--- Silent Aim
+-- ===================== SILENT AIM (stronger) =====================
 pcall(function()
-    local old
-    old = hookmetamethod(game, "__index", newcclosure(function(self, key)
+    local oldIndex
+    oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
         if Settings.SilentAim and CurrentTarget and not checkcaller() then
             if typeof(self) == "Instance" and self:IsA("Mouse") then
-                if key == "Hit" then return CurrentTarget.CFrame
-                elseif key == "Target" then return CurrentTarget end
+                if key == "Hit" or key == "hit" then
+                    return CurrentTarget.CFrame
+                elseif key == "Target" or key == "target" then
+                    return CurrentTarget
+                end
             end
         end
-        return old(self, key)
+        return oldIndex(self, key)
     end))
 end)
-print("silent aim hooked")
 
--- Main loop
+-- also try namecall for some games
+pcall(function()
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if Settings.SilentAim and CurrentTarget and not checkcaller() then
+            if method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "Raycast" then
+                -- some games use these, leave for now
+            end
+        end
+        return oldNamecall(self, ...)
+    end))
+end)
+
+print("silent aim ready")
+
+-- ===================== MAIN LOOP =====================
 RunService.RenderStepped:Connect(function()
     if FOVCircle then
         FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
         FOVCircle.Radius = Settings.FOV
-        FOVCircle.Visible = Settings.ShowFOV and (Settings.Aimbot or Settings.SilentAim)
+        FOVCircle.Visible = Settings.ShowFOV
     end
+
     CurrentTarget = getClosest()
+
     if Settings.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and CurrentTarget then
         local screen = Camera:WorldToViewportPoint(CurrentTarget.Position)
         local move = (Vector2.new(screen.X, screen.Y) - Vector2.new(Mouse.X, Mouse.Y)) * Settings.Smoothness
@@ -94,20 +112,23 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ESP
+-- ===================== ESP =====================
 local function createESP(plr)
     if ESPObjects[plr] then return end
-    local box = Drawing.new("Square")
+    local ok, box = pcall(Drawing.new, "Square")
+    if not ok then return end
     box.Thickness = 1
     box.Filled = false
     box.Color = Color3.fromRGB(255, 50, 50)
     box.Visible = false
+
     local name = Drawing.new("Text")
     name.Size = 13
     name.Center = true
     name.Outline = true
     name.Color = Color3.fromRGB(255, 255, 255)
     name.Visible = false
+
     ESPObjects[plr] = {box = box, name = name}
 end
 
@@ -163,7 +184,7 @@ Players.PlayerAdded:Connect(function(p)
 end)
 Players.PlayerRemoving:Connect(removeESP)
 
--- Infinite Jump
+-- ===================== MOVEMENT =====================
 UserInputService.JumpRequest:Connect(function()
     if Settings.InfiniteJump and Player.Character then
         local hum = Player.Character:FindFirstChildOfClass("Humanoid")
@@ -171,7 +192,6 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- Speed toggle (V key)
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.V then
@@ -187,8 +207,75 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-print("=== CHEAT LOADED ===")
+-- ===================== SIMPLE UI =====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaCheatUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function()
+    ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+end
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 220, 0, 280)
+Frame.Position = UDim2.new(0, 20, 0.5, -140)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "Delta Cheat"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = Frame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+local function makeToggle(name, y, default, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 32)
+    btn.Position = UDim2.new(0, 10, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    btn.Text = name .. ": " .. (default and "ON" or "OFF")
+    btn.TextColor3 = default and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 80, 80)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Parent = Frame
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = btn
+
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = name .. ": " .. (state and "ON" or "OFF")
+        btn.TextColor3 = state and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 80, 80)
+        callback(state)
+    end)
+end
+
+makeToggle("Silent Aim", 45, true, function(v) Settings.SilentAim = v end)
+makeToggle("Aimbot (RMB)", 82, true, function(v) Settings.Aimbot = v end)
+makeToggle("ESP", 119, true, function(v) Settings.ESP = v end)
+makeToggle("Team Check", 156, true, function(v) Settings.TeamCheck = v end)
+makeToggle("Show FOV", 193, true, function(v) Settings.ShowFOV = v end)
+makeToggle("Speed (V)", 230, false, function(v) Settings.Speed = v end)
+
+print("=== CHEAT LOADED v2 ===")
+print("UI should be visible on left side")
 print("Silent Aim + Aimbot + ESP ON")
-print("Hold Right Click = Aimbot")
-print("V = Toggle Speed")
-print("Infinite Jump always on")
