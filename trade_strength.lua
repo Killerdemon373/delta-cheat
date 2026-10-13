@@ -1,4 +1,4 @@
--- [Code: Badges] Trade Strength Auto Farm + Auto Math
+-- [Code: Badges] Trade Strength Auto Farm + Auto Math (Chat)
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/Killerdemon373/delta-cheat/main/trade_strength.lua"))()
 
 print("=== Trade Strength Loading ===")
@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
+local TextChat = game:GetService("TextChatService")
 
 -- Anti AFK
 Player.Idled:Connect(function()
@@ -25,6 +26,8 @@ local Settings = {
     SpeedValue = 50,
     InfiniteJump = true
 }
+
+local answered = {}
 
 -- UI
 local ScreenGui = Instance.new("ScreenGui")
@@ -165,11 +168,11 @@ task.spawn(function()
     end
 end)
 
--- Auto Math Answer
+-- Math solver
 local function solveMath(expr)
-    if not expr or expr == "" then return nil end
+    if not expr then return nil end
     expr = tostring(expr):gsub("%s+", "")
-    expr = expr:gsub("×", "*"):gsub("x", "*"):gsub("X", "*"):gsub("÷", "/")
+    expr = expr:gsub("×", "*"):gsub("x", "*"):gsub("X", "*")
     local a, op, b = expr:match("^(-?%d+%.?%d*)([%+%-%*/])(-?%d+%.?%d*)$")
     if not a then return nil end
     local n1, n2 = tonumber(a), tonumber(b)
@@ -182,44 +185,86 @@ local function solveMath(expr)
     return nil
 end
 
-task.spawn(function()
-    while true do
-        task.wait(0.3)
-        if not Settings.AutoMath then continue end
+local function sendChat(msg)
+    pcall(function()
+        -- TextChatService (new chat)
+        local channels = TextChat:FindFirstChild("TextChannels")
+        if channels then
+            local general = channels:FindFirstChild("RBXGeneral") or channels:FindFirstChild("General")
+            if general then
+                general:SendAsync(tostring(msg))
+                return
+            end
+        end
+    end)
+    pcall(function()
+        -- legacy chat
+        local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+        if chatEvents then
+            local say = chatEvents:FindFirstChild("SayMessageRequest")
+            if say then
+                say:FireServer(tostring(msg), "All")
+            end
+        end
+    end)
+    pcall(function()
+        -- fallback
+        game:GetService("Players"):Chat(tostring(msg))
+    end)
+end
 
-        pcall(function()
-            local pg = Player:FindFirstChild("PlayerGui")
-            if not pg then return end
+-- Auto Math: watch chat messages for "What is X ?"
+pcall(function()
+    local function onMessage(msg)
+        if not Settings.AutoMath then return end
+        local text = tostring(msg)
+        if answered[text] then return end
 
-            -- scan all TextLabels / TextButtons for math-looking text
-            for _, gui in ipairs(pg:GetDescendants()) do
-                if gui:IsA("TextLabel") or gui:IsA("TextButton") then
-                    local text = gui.Text
-                    if text and #text < 30 then
-                        local result = solveMath(text)
-                        if result then
-                            -- try to fire common answer remotes
-                            pcall(function()
-                                for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
-                                    if r:IsA("RemoteEvent") and (r.Name:lower():find("answer") or r.Name:lower():find("math") or r.Name:lower():find("solve") or r.Name:lower() == "ans") then
-                                        r:FireServer(result)
-                                        r:FireServer(tostring(result))
-                                    end
-                                end
-                            end)
+        -- match: What is 19 - 72 ?   or   What is 1 * 9 ?
+        local expr = text:match("[Ww]hat%s+is%s+([%d%.%s%+%-%*/xX×]+)[%s%?]+")
+        if not expr then
+            expr = text:match("([%d%.]+%s*[%+%-%*/xX×]%s*[%d%.]+)")
+        end
 
-                            -- also try putting the answer into any visible TextBox
-                            for _, box in ipairs(pg:GetDescendants()) do
-                                if box:IsA("TextBox") and box.Visible then
-                                    box.Text = tostring(math.floor(result))
-                                end
-                            end
+        if expr then
+            local result = solveMath(expr)
+            if result then
+                answered[text] = true
+                -- slight delay so it looks normal
+                task.wait(0.4 + math.random() * 0.6)
+                local answer = tostring(math.floor(result + 0.5))
+                sendChat(answer)
+                print("[AutoMath] answered:", expr, "=", answer)
+            end
+        end
+    end
+
+    -- TextChatService
+    pcall(function()
+        TextChat.MessageReceived:Connect(function(message)
+            onMessage(message.Text)
+        end)
+    end)
+
+    -- also scan PlayerGui chat labels every second as backup
+    task.spawn(function()
+        while true do
+            task.wait(0.8)
+            if not Settings.AutoMath then continue end
+            pcall(function()
+                local pg = Player:FindFirstChild("PlayerGui")
+                if not pg then return end
+                for _, gui in ipairs(pg:GetDescendants()) do
+                    if (gui:IsA("TextLabel") or gui:IsA("TextButton")) and gui.Text then
+                        local t = gui.Text
+                        if t:find("[Ww]hat is") or t:find("%d%s*[%+%-%*/]%s*%d") then
+                            onMessage(t)
                         end
                     end
                 end
-            end
-        end)
-    end
+            end)
+        end
+    end)
 end)
 
 -- Speed
@@ -239,5 +284,5 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 print("=== Trade Strength Loaded ===")
-print("Auto Math ON | Auto Strength ON")
-print("Use code Badges in shop")
+print("Auto Math answers in CHAT now")
+print("Auto Strength ON")
