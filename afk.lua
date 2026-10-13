@@ -1,4 +1,4 @@
--- Anti AFK / Anti DC
+-- Anti AFK - uses shared Speed_Library
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/Killerdemon373/delta-cheat/main/afk.lua"))()
 
 print("=== Anti AFK Loading ===")
@@ -6,19 +6,20 @@ print("=== Anti AFK Loading ===")
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
-local RunService = game:GetService("RunService")
 
--- Main anti-afk
+local enabled = true
+
 Player.Idled:Connect(function()
+    if not enabled then return end
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
     print("[AntiAFK] prevented idle kick")
 end)
 
--- Extra small movements every 30s just in case
 task.spawn(function()
     while true do
         task.wait(30)
+        if not enabled then continue end
         pcall(function()
             local cam = workspace.CurrentCamera
             if cam then
@@ -30,30 +31,14 @@ task.spawn(function()
     end
 end)
 
--- Tiny UI so you know it's running
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AntiAFK"
-ScreenGui.ResetOnSpawn = false
-pcall(function()
-    ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
-end)
-if not ScreenGui.Parent then
-    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-end
+local Speed_Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Killerdemon373/delta-cheat/main/Speed_Library.lua"))()
+local Window = Speed_Library:CreateWindow({
+    Title = "Anti AFK",
+    Description = "Stay Online",
+    SizeUi = UDim2.fromOffset(320, 160)
+})
 
-local Label = Instance.new("TextLabel")
-Label.Size = UDim2.new(0, 160, 0, 28)
-Label.Position = UDim2.new(1, -170, 0, 10)
-Label.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Label.Text = "Anti AFK: ON"
-Label.TextColor3 = Color3.fromRGB(0, 255, 120)
-Label.Font = Enum.Font.GothamBold
-Label.TextSize = 13
-Label.Parent = ScreenGui
+Window:AddToggle("Anti AFK", true, function(v) enabled = v end)
+Window:AddLabel("Prevents idle disconnect")
 
-local c = Instance.new("UICorner")
-c.CornerRadius = UDim.new(0, 6)
-c.Parent = Label
-
-print("=== Anti AFK Loaded ===")
-print("You should not get disconnected from being idle anymore")
+print("=== Anti AFK Loaded (Speed_Library UI) ===")
