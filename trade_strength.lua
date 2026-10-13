@@ -1,4 +1,4 @@
--- [Code: Badges] Trade Strength Auto Farm
+-- [Code: Badges] Trade Strength Auto Farm + Auto Math
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/Killerdemon373/delta-cheat/main/trade_strength.lua"))()
 
 print("=== Trade Strength Loading ===")
@@ -20,6 +20,7 @@ local Settings = {
     AutoStrength = true,
     AutoSacrifice = false,
     AutoRoll = false,
+    AutoMath = true,
     Speed = false,
     SpeedValue = 50,
     InfiniteJump = true
@@ -38,8 +39,8 @@ if not ScreenGui.Parent then
 end
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 240, 0, 300)
-Frame.Position = UDim2.new(0, 20, 0.3, 0)
+Frame.Size = UDim2.new(0, 240, 0, 340)
+Frame.Position = UDim2.new(0, 20, 0.25, 0)
 Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 Frame.BorderSizePixel = 0
 Frame.Active = true
@@ -95,8 +96,9 @@ end
 makeToggle("Auto Strength", 50, true, function(v) Settings.AutoStrength = v end)
 makeToggle("Auto Sacrifice", 90, false, function(v) Settings.AutoSacrifice = v end)
 makeToggle("Auto Roll", 130, false, function(v) Settings.AutoRoll = v end)
-makeToggle("Speed", 170, false, function(v) Settings.Speed = v end)
-makeToggle("Infinite Jump", 210, true, function(v) Settings.InfiniteJump = v end)
+makeToggle("Auto Math", 170, true, function(v) Settings.AutoMath = v end)
+makeToggle("Speed", 210, false, function(v) Settings.Speed = v end)
+makeToggle("Infinite Jump", 250, true, function(v) Settings.InfiniteJump = v end)
 
 local Status = Instance.new("TextLabel")
 Status.Size = UDim2.new(1, -20, 0, 25)
@@ -108,7 +110,7 @@ Status.Font = Enum.Font.Gotham
 Status.TextSize = 11
 Status.Parent = Frame
 
--- Auto Strength (common remote path from existing scripts)
+-- Auto Strength
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -128,7 +130,6 @@ task.spawn(function()
                     end
                 end
             end)
-            -- fallback: search any strength-related remote
             pcall(function()
                 for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
                     if r:IsA("RemoteEvent") and (r.Name:lower() == "st" or r.Name:lower():find("strength") or r.Name:lower():find("train")) then
@@ -164,6 +165,63 @@ task.spawn(function()
     end
 end)
 
+-- Auto Math Answer
+local function solveMath(expr)
+    if not expr or expr == "" then return nil end
+    expr = tostring(expr):gsub("%s+", "")
+    expr = expr:gsub("×", "*"):gsub("x", "*"):gsub("X", "*"):gsub("÷", "/")
+    local a, op, b = expr:match("^(-?%d+%.?%d*)([%+%-%*/])(-?%d+%.?%d*)$")
+    if not a then return nil end
+    local n1, n2 = tonumber(a), tonumber(b)
+    if not n1 or not n2 then return nil end
+    if op == "+" then return n1 + n2
+    elseif op == "-" then return n1 - n2
+    elseif op == "*" then return n1 * n2
+    elseif op == "/" then if n2 == 0 then return nil end return n1 / n2
+    end
+    return nil
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+        if not Settings.AutoMath then continue end
+
+        pcall(function()
+            local pg = Player:FindFirstChild("PlayerGui")
+            if not pg then return end
+
+            -- scan all TextLabels / TextButtons for math-looking text
+            for _, gui in ipairs(pg:GetDescendants()) do
+                if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+                    local text = gui.Text
+                    if text and #text < 30 then
+                        local result = solveMath(text)
+                        if result then
+                            -- try to fire common answer remotes
+                            pcall(function()
+                                for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
+                                    if r:IsA("RemoteEvent") and (r.Name:lower():find("answer") or r.Name:lower():find("math") or r.Name:lower():find("solve") or r.Name:lower() == "ans") then
+                                        r:FireServer(result)
+                                        r:FireServer(tostring(result))
+                                    end
+                                end
+                            end)
+
+                            -- also try putting the answer into any visible TextBox
+                            for _, box in ipairs(pg:GetDescendants()) do
+                                if box:IsA("TextBox") and box.Visible then
+                                    box.Text = tostring(math.floor(result))
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
 -- Speed
 RunService.Heartbeat:Connect(function()
     if Settings.Speed and Player.Character then
@@ -181,5 +239,5 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 print("=== Trade Strength Loaded ===")
-print("UI on left | Auto Strength ON")
-print("Use code Badges in shop for starter boost")
+print("Auto Math ON | Auto Strength ON")
+print("Use code Badges in shop")
